@@ -234,6 +234,10 @@ public class BillingProcessor extends BillingBase
 						savePurchasePayload(null);
 					}
 				}
+				else if (responseCode == BillingClient.BillingResponseCode.USER_CANCELED)
+				{
+					reportBillingError(BillingClient.BillingResponseCode.USER_CANCELED, null);
+				}
 			}
 		};
 
