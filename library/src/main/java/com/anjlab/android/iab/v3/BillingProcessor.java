@@ -94,10 +94,12 @@ public class BillingProcessor extends BillingBase
 	private static final String SUBSCRIPTIONS_CACHE_KEY = ".subscriptions.cache" + SETTINGS_VERSION;
 	private static final String PURCHASE_PAYLOAD_CACHE_KEY = ".purchase.last" + SETTINGS_VERSION;
 
-	private static final long RECONNECT_TIMER_START_MILLISECONDS = 1000L;
+	private static final long RECONNECT_TIMER_START_MILLISECONDS = 2000L;
 	private static final long RECONNECT_TIMER_MAX_TIME_MILLISECONDS = 1000L * 60L * 15L;
+	private static final int RECONNECT_COUNT = 3;
 
 	private long reconnectMilliseconds = RECONNECT_TIMER_START_MILLISECONDS;
+	private int reconnectCount = 0;
 
 	private BillingClient billingService;
 	private String signatureBase64;
@@ -109,6 +111,12 @@ public class BillingProcessor extends BillingBase
 	private boolean isHistoryTaskExecuted = false;
 
 	private Handler handler = new Handler(Looper.getMainLooper());
+	private Runnable runnableRetryInitialize = new Runnable() {
+		@Override
+		public void run() {
+			initialize();
+		}
+	};
 
 	private class HistoryInitializationTask extends AsyncTask<Void, Void, Boolean>
 	{
@@ -264,6 +272,7 @@ public class BillingProcessor extends BillingBase
 					if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK)
 					{
 						reconnectMilliseconds = RECONNECT_TIMER_START_MILLISECONDS;
+						reconnectCount = 0;
 						// The BillingClient is ready. You can query purchases here.
 						Log.d("GooglePlayConnection; ", "IsConnected");
 
@@ -304,14 +313,12 @@ public class BillingProcessor extends BillingBase
 	 */
 	private void retryBillingClientConnection()
 	{
-		handler.postDelayed(new Runnable()
-		{
-			@Override
-			public void run()
-			{
-				initialize();
-			}
-		}, reconnectMilliseconds);
+        if (reconnectCount >= RECONNECT_COUNT) {
+            return;
+        }
+        reconnectCount++;
+        handler.removeCallbacks(runnableRetryInitialize);
+		handler.postDelayed(runnableRetryInitialize, reconnectMilliseconds);
 
 		reconnectMilliseconds =
 				Math.min(reconnectMilliseconds * 2, RECONNECT_TIMER_MAX_TIME_MILLISECONDS);
@@ -337,6 +344,7 @@ public class BillingProcessor extends BillingBase
 			Log.d(LOG_TAG, "BillingClient can only be used once -- closing connection");
 			billingService.endConnection();
 		}
+		handler.removeCallbacks(runnableRetryInitialize);
 	}
 
 	public boolean isInitialized()
