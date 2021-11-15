@@ -55,6 +55,8 @@ public class BillingProcessor extends BillingBase
 		void onBillingError(int errorCode, @Nullable Throwable error);
 
 		void onBillingInitialized();
+
+		void onBillingInitializeError(int errorCode);
 	}
 
 	/**
@@ -282,12 +284,18 @@ public class BillingProcessor extends BillingBase
 							new HistoryInitializationTask().execute();
 						}
 					}
+					else if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.BILLING_UNAVAILABLE)
+					{
+						eventHandler.onBillingInitializeError(billingResult.getResponseCode());
+						release();
+					}
 					else
 					{
 						retryBillingClientConnection();
-						reportBillingError(
-								billingResult.getResponseCode(),
-								new Throwable(billingResult.getDebugMessage()));
+						if (reconnectCount == RECONNECT_COUNT) {
+							eventHandler.onBillingInitializeError(billingResult.getResponseCode());
+							release();
+						}
 					}
 				}
 
